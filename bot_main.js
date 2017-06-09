@@ -126,12 +126,9 @@ function parse_string_for_command_keyword(content){
 	}
 	return FALSE
 }
-function getCommandObjectByKey(key){
-	return commandList[key];
-}
-function parseMessageForCommandObject(message){
-	return getCommandObjectByKey(parse_string_for_command_keyword(check_message_primary_command_append(message)));
-}
+function getCommandObjectByKey(key){return commandList[key];}
+function parseMessageForCommandObject(message){return getCommandObjectByKey(parse_string_for_command_keyword(check_message_primary_command_append(message)));}
+function textAfterCommandKeyword(content, keyword){return content.substring(keyword.length+command_append_primary.length);}
 
 ///////////////////////////////////////////////////////////////////////////////////////
 //Automatic Command Parse
@@ -163,8 +160,44 @@ const command_coinflip = new newBotCommand('coinflip', FALSE, 'Heads/Tails coinf
 command_coinflip.trigger = function(triggering_message){triggering_message.reply(wrapTextBold(pick(['Heads!', 'Tails!'])));}
 const command_shutdown = new newBotCommand('shutdown', FALSE, 'Immediate bot shutdown.', COMMAND_PERMISSION_OPERATOR);
 command_shutdown.trigger = function(triggering_message){triggering_message.reply(wrapTextBold('Shutting Down'));hard_shutdown();}
-const command_commands = new newBotCommand('commands', FALSE, 'List all commands.', COMMAND_PERMISSION_PUBLIC);command_commands.trigger = function(triggering_message){var output = wrapTextBold('Commands:');for(command in commandList){output += (' ' + command + ',');}output = output.substring(0, output.length-1);output += '.'triggering_message.reply(output);}
+const command_commands = new newBotCommand('commands', FALSE, 'List all commands.', COMMAND_PERMISSION_PUBLIC);
+command_commands.trigger = function(triggering_message){var output = wrapTextBold('Commands:');for(command in commandList){output += (' ' + command + ',');}output = output.substring(0, output.length-1);output += '.';triggering_message.reply(output);}
 
+
+
+const command_roll = new newBotCommand('roll', FALSE, 'Dice roll in 2d6 (number of die = 2, sides of each die = 6)', COMMAND_PERMISSION_PUBLIC);
+command_roll.trigger = function(triggering_message){
+	var inputArray = textAfterCommandKeyword(triggering_message.cleanContent, this.keyword).toLowerCase().trim().split("d");
+	if(inputArray.length != 2){
+		triggering_message.reply('Invalid Format');
+		return
+	}
+	debugOut(inputArray);
+	var die = parseInt(inputArray[0]);
+	var sides = parseInt(inputArray[1]);
+	if(isNaN(die) || isNaN(sides)){
+		triggering_message.reply('Invalid Format');
+		return
+	}
+	if(die > 150 || sides > 300){
+		triggering_message.reply('Too large.');
+	}
+	if(die < 0 || sides < 0){
+		triggering_message.reply('Invalid.');
+	}
+	var i;
+	var ret = 0;
+	var rolls = '(';
+	for(i = 0;i < die; i++){
+		var rolled = rand(0, sides);
+		ret += rolled;
+		rolls += rolled;
+		rolls += '+'
+	}
+	rolls = rolls.substring(0, rolls.length-1);
+	rolls += ')'
+	triggering_message.reply('Rolled: ' + ret + ' ' + rolls);
+}
 
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -311,9 +344,6 @@ client.on('message', message => {
 		}
 	}
 
-	else if(command_content.search('roll') == 0){
-		respond_to_message(message, generate_dice_roll(message));
-	}
 	else if(command_content.search('debug') == 0){
 		debugOut(commandList);
 	}
