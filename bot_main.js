@@ -72,6 +72,8 @@ function round(number, nearest_number){if(nearest_number == undefined){nearest_n
 function shuffle_array(array){var currentIndex = array.length, temporaryValue, randomIndex;while(0 !== currentIndex){randomIndex = Math.floor(Math.random() * currentIndex);currentIndex-=1;temporaryValue=array[currentIndex];array[currentIndex]=array[randomIndex];array[randomIndex] = temporaryValue;}return array;}
 //Get a random item from an array
 function get_random_item_from_array(items){return items[rand(0, items.length-1, TRUE)];}
+//Pick BYOND function
+function pick(array){return get_random_item_from_array(shuffle_array(array));}
 /////////////////////////////
 //System Helpers//
 /////////////////////////////
@@ -130,6 +132,7 @@ function getCommandObjectByKey(key){
 function parseMessageForCommandObject(message){
 	return getCommandObjectByKey(parse_string_for_command_keyword(check_message_primary_command_append(message)));
 }
+
 ///////////////////////////////////////////////////////////////////////////////////////
 //Automatic Command Parse
 function handle_message_commands(message){
@@ -141,29 +144,29 @@ function handle_message_commands(message){
 }
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //Primary Definitions
-var BotCommand = {
-	keyword: '',
-	requires_guild: FALSE,
-	desc: '',
-	permission_requirement: COMMAND_PERMISSION_PUBLIC,
-	on_parse: function(triggering_message){if(this.requires_guild && !is_message_from_guild(triggering_message)){return NULL}if(is_message_from_guild(triggering_message)){if(this.userHasPermission(triggering_message.member)){return this.trigger(triggering_message)}}else{if(this.userHasPermission(triggering_message.author)){return this.trigger(triggering_message)}}}, 
-	userHasPermission: function(user){if(this.permission_level == COMMAND_PERMISSION_OPERATOR){return (check_guildmember_operator(user)|is_user_owner(user))}else if(this.permission_level == COMMAND_PERMISSION_OWNER){return is_user_owner(user)}else{return TRUE}},
-	trigger: function(triggering_message){}
-};
 function newBotCommand(trigger_key, guild_only, description, permission_level){
-	var newCommand = BotCommand;
+	var newCommand = {};
 	newCommand.keyword = trigger_key;
 	newCommand.requires_guild = guild_only;
 	newCommand.desc = description;
 	newCommand.permission_requirement = permission_level;
+	newCommand.on_parse = function(triggering_message){if(this.requires_guild && (is_message_from_guild(triggering_message) == FALSE)){return NULL}if(is_message_from_guild(triggering_message) == TRUE){if(this.userHasPermission(triggering_message.member) == TRUE){return this.trigger(triggering_message)}else{triggering_message.reply(wrapTextBold('Access Denied'))}}else{if(this.userHasPermission(triggering_message.author) == TRUE){return this.trigger(triggering_message)}else{triggering_message.reply(wrapTextBold('Access Denied'))}}}
+	newCommand.userHasPermission = function(user){if(this.permission_requirement == COMMAND_PERMISSION_OPERATOR){if(is_user_owner(user) || check_guildmember_operator(user)){debugOut(is_user_owner(user));debugOut(check_guildmember_operator(user));return TRUE}}else if(this.permission_requirement == COMMAND_PERMISSION_OWNER){return is_user_owner(user)}else{;return TRUE}}
+	newCommand.trigger = function(triggering_message){}
 	registerCommand(newCommand, trigger_key);
 	return newCommand;
 }
 ////////////////////////////////////////Commands
 const command_eightball = new newBotCommand('8ball', FALSE, 'Returns an answer from the Magic 8-ball!', COMMAND_PERMISSION_PUBLIC);
-command_eightball.trigger = function(triggering_message){
-	triggering_message.reply(wrapTextBold(get_random_item_from_array(shuffle_array(eightball_responses))));
-}
+command_eightball.trigger = function(triggering_message){triggering_message.reply(wrapTextBold(get_random_item_from_array(shuffle_array(eightball_responses))));}
+const command_coinflip = new newBotCommand('coinflip', FALSE, 'Heads/Tails coinflip.', COMMAND_PERMISSION_PUBLIC);
+command_coinflip.trigger = function(triggering_message){triggering_message.reply(wrapTextBold(pick(['Heads!', 'Tails!'])));}
+const command_shutdown = new newBotCommand('shutdown', FALSE, 'Immediate bot shutdown.', COMMAND_PERMISSION_OPERATOR);
+command_shutdown.trigger = function(triggering_message){triggering_message.reply(wrapTextBold('Shutting Down'));hard_shutdown();}
+const command_commands = new newBotCommand('commands', FALSE, 'List all commands.', COMMAND_PERMISSION_PUBLIC);command_commands.trigger = function(triggering_message){var output = wrapTextBold('Commands:');for(command in commandList){output += (' ' + command + ',');}output = output.substring(0, output.length-1);output += '.'triggering_message.reply(output);}
+
+
+
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 
@@ -188,28 +191,9 @@ function set_stealth(stealth_mode){
 	}
 }
 
-function reply_with_commands(message){
-	var response = ""
-	response += "Primary Trigger Word:" + command_append_primary + EOL
-	response += "Commands: " + EOL
-	for(i in commandList)
-		response += command_append_primary + commandList[i] + " "
-	respond_to_message(message, response);
-}
-
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //Random Functions
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-//Generates "Heads" or "Tails"
-function coinflip(){var result = Math.round(Math.random());if(result == 1){result = 'Heads!'}else{result = 'Tails!'}return result}
-//8ball!
-function generate_8ball_response(message){
-	message.reply(wrapTextBold(get_random_item_from_array(shuffle_array(eightball_responses))));
-}
-
-function generate_dice_roll(message){
-		
-}
 
 
 
@@ -312,19 +296,10 @@ client.on('message', message => {
 	command_content = command_content.toLowerCase();
 	console.log('Command Parse:');
 	console.log(command_content);	
-	if(command_content.search('coinflip') == 0){
-		respond_to_message(message, coinflip());
-	}
-	else if(command_content.search('shutdown') == 0){
-		if(check_operator_from_message(message, guild)){
-			respond_to_message(message, 'Shutting Down');
-			hard_shutdown();
-		}
-		else{
-			respond_to_message(message, 'No.');
-		}
-	}
-	else if(command_content.search('stealthmin') == 0){
+	//if(command_content.search('coinflip') == 0){
+		//respond_to_message(message, coinflip());
+	//}
+	if(command_content.search('stealthmin') == 0){
 		if(is_user_owner(message.author) == 0){
 			return FALSE
 		}
@@ -335,17 +310,12 @@ client.on('message', message => {
 			set_stealth(1)
 		}
 	}
-	//else if(command_content.search('8ball') == 0){
-	//	generate_8ball_response(message);
-	//	}
-	else if(command_content.search('commands') == 0){
-		reply_with_commands(message);
-	}
+
 	else if(command_content.search('roll') == 0){
 		respond_to_message(message, generate_dice_roll(message));
 	}
-	else if(command_content.search('debug') ==0){
-
+	else if(command_content.search('debug') == 0){
+		debugOut(commandList);
 	}
 	
 });
