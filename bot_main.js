@@ -29,6 +29,8 @@ const eightball_responses = ['It is certain.', 'It is decidedly so.', 'Without a
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //Command list Object
 var commandList = {};
+//Command categories
+var commandsByCategory = {};
 //Silences the bot.
 var stealthmin = 0;
 //Primary command append - Used in channels
@@ -64,7 +66,7 @@ function abs(number){return Math.abs(number)}
 //Random number between low and high, integer specifies whether to round.
 function rand(low, high, integer){var ret = (Math.random()*(abs(low)+abs(high)))-abs(low);if(integer == TRUE){ret = Math.round(ret);}debugOut('Random Generated ' + ret);return ret;}
 //Gets nearest multiple of nearest_number.
-function round(number, nearest_number){if(nearest_number == undefined){nearest_number = 1}if(nearest_number == 0){return NULL}return (number - (number % nearest_number));}
+function round(number, nearest_number){if(nearest_number == undefined){nearest_number = 1}if(nearest_number == 0){return NULL}var remain = number % nearest_number;if(remain > (nearest_number / 2)){return (number - remain + nearest_number);}else{return(number - remain)}}
 /////////////////////////////
 //Array Helpers//
 /////////////////////////////
@@ -111,97 +113,63 @@ client.login(token);
 //Standardized Commands
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //Helpers//
-function registerCommand(commandObject, triggerKeyword){commandList[triggerKeyword] = commandObject};
-function parse_string_for_command_keyword(content){
-	if(content == FALSE){
-		return NULL
-	}
-	var parseString = content.toLowerCase();
-	for(i in commandList){
-		if(commandList.hasOwnProperty(i)){
-			if(parseString.search(i.toLowerCase()) == 0){
-				return i;
-			}
-		}
-	}
-	return FALSE
-}
+function registerCommand(commandObject, triggerKeyword, category){commandList[triggerKeyword] = commandObject;if(commandsByCategory[category] && commandsByCategory[category].constructor == Object){commandsByCategory[category] += commandObject}else{commandsByCategory[category] = {};commandsByCategory[category][triggerKeyword] = commandObject;}};
+function parse_string_for_command_keyword(content){if(content == FALSE){return NULL}var parseString = content.toLowerCase();for(i in commandList){if(commandList.hasOwnProperty(i)){if((parseString.search(i.toLowerCase()) == 0) && (parseString.length == i.length || parseString.charAt(i.length) == " ")){return i;}}}return FALSE}
 function getCommandObjectByKey(key){return commandList[key];}
 function parseMessageForCommandObject(message){return getCommandObjectByKey(parse_string_for_command_keyword(check_message_primary_command_append(message)));}
 function textAfterCommandKeyword(content, keyword){return content.substring(keyword.length+command_append_primary.length);}
 
 ///////////////////////////////////////////////////////////////////////////////////////
 //Automatic Command Parse
-function handle_message_commands(message){
-	var found = parseMessageForCommandObject(message);
-	if(found == NULL){
-		return
-	}
-	found.on_parse(message);
-}
+function handle_message_commands(message){var found = parseMessageForCommandObject(message);if(found == NULL){return}found.on_parse(message);}
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //Primary Definitions
-function newBotCommand(trigger_key, guild_only, description, permission_level){
+function newBotCommand(trigger_key, guild_only, description, category_new, permission_level){
 	var newCommand = {};
 	newCommand.keyword = trigger_key;
 	newCommand.requires_guild = guild_only;
+	newCommand.category = category_new
 	newCommand.desc = description;
 	newCommand.permission_requirement = permission_level;
 	newCommand.on_parse = function(triggering_message){if(this.requires_guild && (is_message_from_guild(triggering_message) == FALSE)){return NULL}if(is_message_from_guild(triggering_message) == TRUE){if(this.userHasPermission(triggering_message.member) == TRUE){return this.trigger(triggering_message)}else{triggering_message.reply(wrapTextBold('Access Denied'))}}else{if(this.userHasPermission(triggering_message.author) == TRUE){return this.trigger(triggering_message)}else{triggering_message.reply(wrapTextBold('Access Denied'))}}}
 	newCommand.userHasPermission = function(user){if(this.permission_requirement == COMMAND_PERMISSION_OPERATOR){if(is_user_owner(user) || check_guildmember_operator(user)){debugOut(is_user_owner(user));debugOut(check_guildmember_operator(user));return TRUE}}else if(this.permission_requirement == COMMAND_PERMISSION_OWNER){return is_user_owner(user)}else{;return TRUE}}
 	newCommand.trigger = function(triggering_message){}
-	registerCommand(newCommand, trigger_key);
+	registerCommand(newCommand, trigger_key, category_new);
 	return newCommand;
 }
 ////////////////////////////////////////Commands
-const command_eightball = new newBotCommand('8ball', FALSE, 'Returns an answer from the Magic 8-ball!', COMMAND_PERMISSION_PUBLIC);
+const command_eightball = new newBotCommand('8ball', FALSE, 'Returns an answer from the Magic 8-ball!', 'Fun', COMMAND_PERMISSION_PUBLIC);
 command_eightball.trigger = function(triggering_message){triggering_message.reply(wrapTextBold(get_random_item_from_array(shuffle_array(eightball_responses))));}
-const command_coinflip = new newBotCommand('coinflip', FALSE, 'Heads/Tails coinflip.', COMMAND_PERMISSION_PUBLIC);
+const command_coinflip = new newBotCommand('coinflip', FALSE, 'Heads/Tails coinflip.', 'Fun', COMMAND_PERMISSION_PUBLIC);
 command_coinflip.trigger = function(triggering_message){triggering_message.reply(wrapTextBold(pick(['Heads!', 'Tails!'])));}
-const command_shutdown = new newBotCommand('shutdown', FALSE, 'Immediate bot shutdown.', COMMAND_PERMISSION_OPERATOR);
+const command_shutdown = new newBotCommand('shutdown', FALSE, 'Immediate bot shutdown.', 'Admin', COMMAND_PERMISSION_OPERATOR);
 command_shutdown.trigger = function(triggering_message){triggering_message.reply(wrapTextBold('Shutting Down'));hard_shutdown();}
-const command_commands = new newBotCommand('commands', FALSE, 'List all commands.', COMMAND_PERMISSION_PUBLIC);
-command_commands.trigger = function(triggering_message){var output = wrapTextBold('Commands:');for(command in commandList){output += (' ' + command + ',');}output = output.substring(0, output.length-1);output += '.';triggering_message.reply(output);}
-
-
-
-const command_roll = new newBotCommand('roll', FALSE, 'Dice roll in 2d6 (number of die = 2, sides of each die = 6)', COMMAND_PERMISSION_PUBLIC);
-command_roll.trigger = function(triggering_message){
-	var inputArray = textAfterCommandKeyword(triggering_message.cleanContent, this.keyword).toLowerCase().trim().split("d");
-	if(inputArray.length != 2){
-		triggering_message.reply('Invalid Format');
-		return
+const command_commands = new newBotCommand('commands', FALSE, 'List all commands.', 'Basic', COMMAND_PERMISSION_PUBLIC);
+command_commands.trigger = function(triggering_message){
+	var output = wrapTextBold('Commands: ') + EOL;
+	for(cat in commandsByCategory){
+		output += commandsByCategory[cat] + ': ';
+		for(command in cat){
+			output += cat[command] += ', ';
+		}
+		ouput = output.substring(0, output.length-2);
+		output += EOL;
 	}
-	debugOut(inputArray);
-	var die = parseInt(inputArray[0]);
-	var sides = parseInt(inputArray[1]);
-	if(isNaN(die) || isNaN(sides)){
-		triggering_message.reply('Invalid Format');
-		return
-	}
-	if(die > 150 || sides > 300){
-		triggering_message.reply('Too large.');
-	}
-	if(die < 0 || sides < 0){
-		triggering_message.reply('Invalid.');
-	}
-	var i;
-	var ret = 0;
-	var rolls = '(';
-	for(i = 0;i < die; i++){
-		var rolled = rand(0, sides);
-		ret += rolled;
-		rolls += rolled;
-		rolls += '+'
-	}
-	rolls = rolls.substring(0, rolls.length-1);
-	rolls += ')'
-	triggering_message.reply('Rolled: ' + ret + ' ' + rolls);
+	triggering_message.reply(output);
 }
+const command_roll = new newBotCommand('roll', FALSE, 'Dice roll in 2d6 (number of die = 2, sides of each die = 6)', 'Fun', COMMAND_PERMISSION_PUBLIC);
+command_roll.trigger = function(triggering_message){var inputArray = textAfterCommandKeyword(triggering_message.cleanContent, this.keyword).toLowerCase().trim().split("d");if(inputArray.length != 2){triggering_message.reply('Invalid Format');return}var die = parseInt(inputArray[0]);var sides = parseInt(inputArray[1]);if(isNaN(die) || isNaN(sides)){triggering_message.reply('Invalid Format');return}if(die > 150 || sides > 300){triggering_message.reply('Too large.');return}if(die <= 0 || sides <= 0){triggering_message.reply('Invalid.');return}var i;var ret = 0;var rolls = '(';for(i = 0;i < die; i++){var rolled = round(rand(0, sides),1);ret += rolled;rolls += rolled;rolls += '+';}rolls = rolls.substring(0, rolls.length-1);rolls += ')';triggering_message.reply('Rolled: ' + ret + ' ' + rolls);}
+const command_rand = new newBotCommand('rand', FALSE, '!rand lower upper - Returns a rounded integer.', 'Misc', COMMAND_PERMISSION_PUBLIC);
+command_rand.trigger = function(triggering_message){var inputArray = textAfterCommandKeyword(triggering_message.cleanContent, this.keyword).toLowerCase().trim().split(' ');if(inputArray.length != 2){triggering_message.reply('Invalid Format');return}var low = parseInt(inputArray[0]);var high = parseInt(inputArray[1]);if(isNaN(low)||isNaN(high)){triggering_message.reply('Invalid input');return;}if(high < low){triggering_message.reply('High is lower than low!');return;}triggering_message.reply(rand(low,high,TRUE))};
+const command_rand_float = new newBotCommand('rand_float', FALSE, '!rand_float lower upper - Returns raw value float.', 'Misc', COMMAND_PERMISSION_PUBLIC);
+command_rand_float.trigger = function(triggering_message){var inputArray = textAfterCommandKeyword(triggering_message.cleanContent, this.keyword).toLowerCase().trim().split(' ');	if(inputArray.length != 2){triggering_message.reply('Invalid Format');return;}var low = parseInt(inputArray[0]);var high = parseInt(inputArray[1]);if(isNaN(low)||isNaN(high)){triggering_message.reply('Invalid input');return;}if(high < low){triggering_message.reply('High is lower than low!');return;}triggering_message.reply(rand(low,high))};
 
+debugOut(commandsByCategory);
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 
 //LOGGING
