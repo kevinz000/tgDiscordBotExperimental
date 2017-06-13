@@ -57,3 +57,18 @@ typings/
 # dotenv environment variables file
 .env
 package-lock.json
+
+#musicbot dependency
+python_musicbot/.idea/
+python_musicbot/*.pyc
+python_musicbot/~*/
+
+python_musicbot/audio_cache/
+python_musicbot/dectalk/
+
+python_musicbot/discord.log
+python_musicbot/config/options.ini
+python_musicbot/config/permissions.ini
+
+
+
